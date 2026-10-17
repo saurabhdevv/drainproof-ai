@@ -1,0 +1,1994 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>DrainProof AI</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#f4f7fb;--ink:#0f1f33;--mut:#5b6b80;--card:#fff;--line:#e1e8f0;--navy:#0b2540;--teal:#0fa3a3;--red:#d64545;--amb:#e8a317;--grn:#2f9e6b;--blu:#2e6fd8}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);width:1440px;height:810px;overflow:hidden;display:flex}
+aside{width:210px;background:var(--navy);color:#cfe0f2;padding:22px 16px;display:flex;flex-direction:column;gap:6px}
+.logo{font-weight:700;font-size:19px;color:#fff;letter-spacing:.2px;margin-bottom:2px}.logo span{color:var(--teal)}
+.sub{font-size:11px;color:#8fa9c4;margin-bottom:18px}
+aside a{padding:9px 12px;border-radius:8px;color:#cfe0f2;text-decoration:none;font-size:13.5px}
+aside a.on{background:#17406b;color:#fff}
+.foot{margin-top:auto;font-size:11px;color:#7f9bb8;border-top:1px solid #1d3a5c;padding-top:10px}
+main{flex:1;padding:20px 26px;display:flex;flex-direction:column;gap:14px;min-width:0}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:21px;margin:0}.pill{background:#fff;border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--mut)}
+.pill b{color:var(--red)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.k{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+.k .v{font-size:25px;font-weight:700}.k .l{font-size:11.5px;color:var(--mut)}
+.view{display:none;flex:1;gap:14px;min-height:0}.view.on{display:flex}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.card h3{margin:0 0 8px;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}th{text-align:left;color:var(--mut);font-weight:600;padding:5px 6px;border-bottom:1px solid var(--line);font-size:11.5px}
+td{padding:5px 6px;border-bottom:1px solid #eef2f7}
+.b{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.hi{background:#fde6e6;color:var(--red)}.md{background:#fdf1d3;color:#9a6a00}.lo{background:#dcf3e8;color:var(--grn)}.ok{background:#dcf3e8;color:var(--grn)}.re{background:#fdf1d3;color:#9a6a00}
+.bar{height:7px;background:#e8eef5;border-radius:4px;overflow:hidden;width:90px;display:inline-block;vertical-align:middle}.bar i{display:block;height:100%}
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--mut);margin-top:6px}.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pair figure{margin:0}.pair img{width:100%;border-radius:8px;display:block}
+.pair figcaption{font-size:11.5px;color:var(--mut);margin-top:3px}
+.log div{display:grid;grid-template-columns:52px 82px 1fr;gap:8px;padding:5px 0;border-bottom:1px solid #eef2f7;font-size:12.5px}
+.log .t{color:var(--mut)}.log .s{font-weight:700;font-size:11px;padding-top:1px}
+.s.PREDICT{color:var(--blu)}.s.PLAN,.s.DISPATCH{color:var(--teal)}.s.VERIFY{color:var(--grn)}.s.REOPEN{color:var(--amb)}.s.REPORT{color:var(--navy)}.s.ESCALATE{color:var(--red)}
+</style></head><body>
+<aside><div class="logo">Drain<span>Proof</span> AI</div><div class="sub">Predict · Dispatch · Verify</div>
+<a href="#map" id="n-map">Risk map</a><a href="#tasks" id="n-tasks">Agent task plan</a><a href="#verify" id="n-verify">Photo verification</a><a href="#log" id="n-log">Agent activity</a>
+<div class="foot">Demo with synthetic data<br>Model: gradient boosting<br>Vision: debris segmentation</div></aside>
+<main>
+<header><h1 id="title"></h1><div class="pill">Heavy-rain forecast: <b id="rain"></b> mm in <b id="eta"></b> h</div></header>
+<div class="kpis" id="kpis"></div>
+<section class="view" id="v-map">
+ <div class="card" style="flex:1.5"><h3>Waterlogging risk by drain (before action)</h3><svg id="map" width="100%" height="410" viewBox="0 0 700 410"></svg>
+  <div class="legend"><span><i style="background:#d64545"></i>High risk (&ge;0.65)</span><span><i style="background:#e8a317"></i>Medium (0.45-0.65)</span><span><i style="background:#2f9e6b"></i>Low (&lt;0.45)</span><span>Bigger ring = critical site (hospital / station)</span></div></div>
+ <div class="card" style="flex:1"><h3>Top 10 drains to fix first</h3><table id="top"></table></div>
+</section>
+<section class="view" id="v-tasks"><div class="card" style="flex:1.7;overflow:hidden"><h3>Agent-generated maintenance plan (sorted by priority)</h3><table id="tt"></table></div>
+ <div class="card" style="flex:1"><h3>Crew workload</h3><div id="crews"></div><h3 style="margin-top:16px">Why these drains?</h3><div style="font-size:12.5px;color:var(--mut)">Priority = risk &times; site criticality &times; flood history. The agent assigns the nearest crew with free capacity and books every slot to finish before rain onset. Tasks that do not fit are escalated to a supervisor.</div></div></section>
+<section class="view" id="v-verify"><div class="card" style="flex:1.4"><h3>Completion verified by photo evidence</h3><div id="pairs" style="display:grid;grid-template-columns:1fr 1fr;gap:10px 14px"></div></div>
+ <div class="card" style="flex:1"><h3>Verification results</h3><table id="vt"></table></div></section>
+<section class="view" id="v-log"><div class="card" style="flex:1.2;overflow:hidden"><h3>Autonomous agent log</h3><div class="log" id="log"></div></div>
+ <div class="card" style="flex:1"><h3>Risk before vs after</h3><svg id="ba" width="100%" height="330" viewBox="0 0 420 330"></svg><h3 style="margin-top:6px">What drives the risk model</h3><div id="imp"></div></div></section>
+</main>
+<script>
+const D={
+ "summary": {
+  "drains": 60,
+  "high_risk_before": 36,
+  "high_risk_after": 0,
+  "tasks": 36,
+  "reopened": 4,
+  "verified": 36,
+  "mean_risk_before": 0.488,
+  "mean_risk_after": 0.21,
+  "vision_mae_pct": 3.0,
+  "rain_mm": 60,
+  "rain_eta_h": 36
+ },
+ "model": {
+  "metrics": {
+   "auc": 0.774,
+   "precision": 0.686,
+   "recall": 0.563,
+   "n_train": 3000,
+   "n_test": 1000,
+   "base_rate": 0.396
+  },
+  "importances": [
+   [
+    "rain_mm_24h",
+    0.283
+   ],
+   [
+    "blockage_pct",
+    0.264
+   ],
+   [
+    "days_since_clean",
+    0.146
+   ],
+   [
+    "silt_depth_cm",
+    0.08
+   ],
+   [
+    "elevation_m",
+    0.08
+   ],
+   [
+    "imperviousness",
+    0.074
+   ],
+   [
+    "cover_damaged",
+    0.037
+   ],
+   [
+    "past_events",
+    0.035
+   ]
+  ]
+ },
+ "drains": [
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 5.4,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 216.5673679198,
+   "imperviousness": 0.9935356734,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Old Town",
+   "lat": 28.5962961524,
+   "lon": 77.2923312753,
+   "critical": 0,
+   "id": "DR-100",
+   "before_blockage_pct": 66.9,
+   "risk": 0.752,
+   "priority": 0.752,
+   "risk_after": 0.145
+  },
+  {
+   "silt_depth_cm": 6.5141935893,
+   "blockage_pct": 13.7,
+   "cover_damaged": 0,
+   "days_since_clean": 157,
+   "elevation_m": 219.1299892905,
+   "imperviousness": 0.7540128267,
+   "rain_mm_24h": 60.0,
+   "past_events": 5,
+   "zone": "Station Road",
+   "lat": 28.6428495786,
+   "lon": 77.2604124636,
+   "critical": 0,
+   "id": "DR-101",
+   "before_blockage_pct": 13.7,
+   "risk": 0.354,
+   "priority": 0.442,
+   "risk_after": 0.354
+  },
+  {
+   "silt_depth_cm": 12.0389198138,
+   "blockage_pct": 49.1,
+   "cover_damaged": 0,
+   "days_since_clean": 29,
+   "elevation_m": 209.9127795936,
+   "imperviousness": 0.803150127,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Tech Park",
+   "lat": 28.6407314687,
+   "lon": 77.2000012053,
+   "critical": 0,
+   "id": "DR-102",
+   "before_blockage_pct": 49.1,
+   "risk": 0.394,
+   "priority": 0.414,
+   "risk_after": 0.394
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 10.4,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 215.8929082831,
+   "imperviousness": 0.8762837167,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Old Town",
+   "lat": 28.6082763142,
+   "lon": 77.2977586759,
+   "critical": 0,
+   "id": "DR-103",
+   "before_blockage_pct": 68.5,
+   "risk": 0.817,
+   "priority": 0.858,
+   "risk_after": 0.182
+  },
+  {
+   "silt_depth_cm": 2.7737327092,
+   "blockage_pct": 31.1,
+   "cover_damaged": 0,
+   "days_since_clean": 48,
+   "elevation_m": 218.9535041135,
+   "imperviousness": 0.7777102056,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Central Market",
+   "lat": 28.6074224147,
+   "lon": 77.1855826325,
+   "critical": 0,
+   "id": "DR-104",
+   "before_blockage_pct": 31.1,
+   "risk": 0.139,
+   "priority": 0.139,
+   "risk_after": 0.139
+  },
+  {
+   "silt_depth_cm": 6.0224170661,
+   "blockage_pct": 34.7,
+   "cover_damaged": 0,
+   "days_since_clean": 179,
+   "elevation_m": 221.092181737,
+   "imperviousness": 0.437345944,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Old Town",
+   "lat": 28.6089192731,
+   "lon": 77.2882548871,
+   "critical": 0,
+   "id": "DR-105",
+   "before_blockage_pct": 34.7,
+   "risk": 0.238,
+   "priority": 0.238,
+   "risk_after": 0.238
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 12.2,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 211.4507025685,
+   "imperviousness": 0.5777400585,
+   "rain_mm_24h": 60.0,
+   "past_events": 2,
+   "zone": "Station Road",
+   "lat": 28.644883136,
+   "lon": 77.2576730968,
+   "critical": 0,
+   "id": "DR-106",
+   "before_blockage_pct": 80.7,
+   "risk": 0.908,
+   "priority": 0.999,
+   "risk_after": 0.225
+  },
+  {
+   "silt_depth_cm": 0.5592979384,
+   "blockage_pct": 62.0,
+   "cover_damaged": 0,
+   "days_since_clean": 284,
+   "elevation_m": 222.7638237307,
+   "imperviousness": 0.8251349468,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.6074614311,
+   "lon": 77.2054728989,
+   "critical": 0,
+   "id": "DR-107",
+   "before_blockage_pct": 62.0,
+   "risk": 0.404,
+   "priority": 0.424,
+   "risk_after": 0.404
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 9.7,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 214.1363009091,
+   "imperviousness": 0.538900602,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.5779477649,
+   "lon": 77.2539947901,
+   "critical": 0,
+   "id": "DR-108",
+   "before_blockage_pct": 42.0,
+   "risk": 0.624,
+   "priority": 0.655,
+   "risk_after": 0.198
+  },
+  {
+   "silt_depth_cm": 6.991514011,
+   "blockage_pct": 28.0,
+   "cover_damaged": 0,
+   "days_since_clean": 71,
+   "elevation_m": 215.8154095083,
+   "imperviousness": 0.6413791186,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.6002878012,
+   "lon": 77.2538431366,
+   "critical": 0,
+   "id": "DR-109",
+   "before_blockage_pct": 28.0,
+   "risk": 0.214,
+   "priority": 0.225,
+   "risk_after": 0.214
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 4.9,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 222.214794535,
+   "imperviousness": 0.723533557,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Tech Park",
+   "lat": 28.6446113397,
+   "lon": 77.1999089871,
+   "critical": 0,
+   "id": "DR-110",
+   "before_blockage_pct": 60.7,
+   "risk": 0.562,
+   "priority": 0.59,
+   "risk_after": 0.153
+  },
+  {
+   "silt_depth_cm": 17.4560600148,
+   "blockage_pct": 46.7,
+   "cover_damaged": 0,
+   "days_since_clean": 216,
+   "elevation_m": 214.7166613897,
+   "imperviousness": 0.490649046,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Riverside",
+   "lat": 28.5993897627,
+   "lon": 77.2546452702,
+   "critical": 0,
+   "id": "DR-111",
+   "before_blockage_pct": 46.7,
+   "risk": 0.44,
+   "priority": 0.44,
+   "risk_after": 0.44
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 9.6,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 214.2394967682,
+   "imperviousness": 0.668164789,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Station Road",
+   "lat": 28.6288274757,
+   "lon": 77.2557133662,
+   "critical": 1,
+   "id": "DR-112",
+   "before_blockage_pct": 49.0,
+   "risk": 0.522,
+   "priority": 0.877,
+   "risk_after": 0.211
+  },
+  {
+   "silt_depth_cm": 14.3276224354,
+   "blockage_pct": 32.3,
+   "cover_damaged": 0,
+   "days_since_clean": 58,
+   "elevation_m": 213.8041645325,
+   "imperviousness": 0.7829645338,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Tech Park",
+   "lat": 28.6470157893,
+   "lon": 77.1920905965,
+   "critical": 0,
+   "id": "DR-113",
+   "before_blockage_pct": 32.3,
+   "risk": 0.384,
+   "priority": 0.403,
+   "risk_after": 0.384
+  },
+  {
+   "silt_depth_cm": 4.3358167659,
+   "blockage_pct": 39.4,
+   "cover_damaged": 0,
+   "days_since_clean": 86,
+   "elevation_m": 217.9318112054,
+   "imperviousness": 0.4240163949,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Hospital Belt",
+   "lat": 28.627497194,
+   "lon": 77.3090261199,
+   "critical": 0,
+   "id": "DR-114",
+   "before_blockage_pct": 39.4,
+   "risk": 0.226,
+   "priority": 0.237,
+   "risk_after": 0.226
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 7.1,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 216.9083671932,
+   "imperviousness": 0.7658211263,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Old Town",
+   "lat": 28.5962266252,
+   "lon": 77.2961674939,
+   "critical": 0,
+   "id": "DR-115",
+   "before_blockage_pct": 58.1,
+   "risk": 0.812,
+   "priority": 0.853,
+   "risk_after": 0.156
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 4.8,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 217.6283382207,
+   "imperviousness": 0.7686644894,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Tech Park",
+   "lat": 28.629854238,
+   "lon": 77.2024131607,
+   "critical": 0,
+   "id": "DR-116",
+   "before_blockage_pct": 49.2,
+   "risk": 0.491,
+   "priority": 0.491,
+   "risk_after": 0.111
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.4,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 215.9674653822,
+   "imperviousness": 1.0,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.5931489106,
+   "lon": 77.2016139276,
+   "critical": 0,
+   "id": "DR-117",
+   "before_blockage_pct": 49.3,
+   "risk": 0.739,
+   "priority": 0.776,
+   "risk_after": 0.215
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.4,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 213.4853713677,
+   "imperviousness": 0.7122759915,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.6158380541,
+   "lon": 77.1972239809,
+   "critical": 0,
+   "id": "DR-118",
+   "before_blockage_pct": 51.0,
+   "risk": 0.617,
+   "priority": 0.648,
+   "risk_after": 0.193
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.4,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 216.2965000306,
+   "imperviousness": 0.2943063619,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Central Market",
+   "lat": 28.59412589,
+   "lon": 77.1936489829,
+   "critical": 0,
+   "id": "DR-119",
+   "before_blockage_pct": 11.5,
+   "risk": 0.583,
+   "priority": 0.583,
+   "risk_after": 0.082
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 4.6,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 218.0963538469,
+   "imperviousness": 0.710995082,
+   "rain_mm_24h": 60.0,
+   "past_events": 3,
+   "zone": "Central Market",
+   "lat": 28.6044618828,
+   "lon": 77.1878988452,
+   "critical": 0,
+   "id": "DR-120",
+   "before_blockage_pct": 65.6,
+   "risk": 0.575,
+   "priority": 0.661,
+   "risk_after": 0.126
+  },
+  {
+   "silt_depth_cm": 7.9629434388,
+   "blockage_pct": 14.5,
+   "cover_damaged": 0,
+   "days_since_clean": 39,
+   "elevation_m": 211.9087160172,
+   "imperviousness": 0.6607977004,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Hospital Belt",
+   "lat": 28.6469441421,
+   "lon": 77.31065541,
+   "critical": 1,
+   "id": "DR-121",
+   "before_blockage_pct": 14.5,
+   "risk": 0.139,
+   "priority": 0.234,
+   "risk_after": 0.139
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 9.5,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 217.650623189,
+   "imperviousness": 0.9406867588,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.5982426429,
+   "lon": 77.2111920246,
+   "critical": 0,
+   "id": "DR-122",
+   "before_blockage_pct": 44.3,
+   "risk": 0.542,
+   "priority": 0.569,
+   "risk_after": 0.173
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 10.7,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 219.4775601817,
+   "imperviousness": 0.8452973229,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Central Market",
+   "lat": 28.6081485679,
+   "lon": 77.1977905241,
+   "critical": 0,
+   "id": "DR-123",
+   "before_blockage_pct": 61.6,
+   "risk": 0.781,
+   "priority": 0.781,
+   "risk_after": 0.141
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 10.6,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 213.2292131106,
+   "imperviousness": 0.6717602396,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Hospital Belt",
+   "lat": 28.6598741699,
+   "lon": 77.2864561432,
+   "critical": 1,
+   "id": "DR-124",
+   "before_blockage_pct": 53.9,
+   "risk": 0.741,
+   "priority": 1.245,
+   "risk_after": 0.226
+  },
+  {
+   "silt_depth_cm": 13.6039723047,
+   "blockage_pct": 22.9,
+   "cover_damaged": 0,
+   "days_since_clean": 24,
+   "elevation_m": 223.9536137616,
+   "imperviousness": 0.5867327286,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.6073464943,
+   "lon": 77.2637658786,
+   "critical": 0,
+   "id": "DR-125",
+   "before_blockage_pct": 22.9,
+   "risk": 0.109,
+   "priority": 0.114,
+   "risk_after": 0.109
+  },
+  {
+   "silt_depth_cm": 18.0530321169,
+   "blockage_pct": 32.2,
+   "cover_damaged": 0,
+   "days_since_clean": 78,
+   "elevation_m": 219.0524896492,
+   "imperviousness": 0.641242302,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Old Town",
+   "lat": 28.5909607016,
+   "lon": 77.2955280186,
+   "critical": 0,
+   "id": "DR-126",
+   "before_blockage_pct": 32.2,
+   "risk": 0.193,
+   "priority": 0.193,
+   "risk_after": 0.193
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 9.2,
+   "cover_damaged": 1,
+   "days_since_clean": 0,
+   "elevation_m": 214.7599183631,
+   "imperviousness": 0.8748684267,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Tech Park",
+   "lat": 28.6426534834,
+   "lon": 77.2043787724,
+   "critical": 0,
+   "id": "DR-127",
+   "before_blockage_pct": 33.4,
+   "risk": 0.529,
+   "priority": 0.529,
+   "risk_after": 0.11
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 9.0,
+   "cover_damaged": 1,
+   "days_since_clean": 0,
+   "elevation_m": 213.8548633292,
+   "imperviousness": 0.7861450782,
+   "rain_mm_24h": 60.0,
+   "past_events": 2,
+   "zone": "Riverside",
+   "lat": 28.6156233267,
+   "lon": 77.2521153065,
+   "critical": 0,
+   "id": "DR-128",
+   "before_blockage_pct": 43.4,
+   "risk": 0.753,
+   "priority": 0.828,
+   "risk_after": 0.146
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 7.6,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 218.1790291764,
+   "imperviousness": 0.7882318933,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Old Town",
+   "lat": 28.5875985517,
+   "lon": 77.2901085377,
+   "critical": 0,
+   "id": "DR-129",
+   "before_blockage_pct": 51.3,
+   "risk": 0.621,
+   "priority": 0.652,
+   "risk_after": 0.154
+  },
+  {
+   "silt_depth_cm": 10.451095312,
+   "blockage_pct": 22.1,
+   "cover_damaged": 1,
+   "days_since_clean": 75,
+   "elevation_m": 223.7934507328,
+   "imperviousness": 0.6409829639,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Station Road",
+   "lat": 28.622028489,
+   "lon": 77.2631395123,
+   "critical": 1,
+   "id": "DR-130",
+   "before_blockage_pct": 22.1,
+   "risk": 0.212,
+   "priority": 0.356,
+   "risk_after": 0.212
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 3.7,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 212.1150213839,
+   "imperviousness": 0.6351848863,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.5996163885,
+   "lon": 77.1956294001,
+   "critical": 0,
+   "id": "DR-131",
+   "before_blockage_pct": 43.2,
+   "risk": 0.581,
+   "priority": 0.61,
+   "risk_after": 0.171
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.0,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 213.8635585428,
+   "imperviousness": 0.664282252,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.626706188,
+   "lon": 77.1752846512,
+   "critical": 0,
+   "id": "DR-132",
+   "before_blockage_pct": 33.9,
+   "risk": 0.643,
+   "priority": 0.675,
+   "risk_after": 0.214
+  },
+  {
+   "silt_depth_cm": 15.9654794772,
+   "blockage_pct": 25.9,
+   "cover_damaged": 0,
+   "days_since_clean": 58,
+   "elevation_m": 218.506546283,
+   "imperviousness": 0.8425661555,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.6023401305,
+   "lon": 77.2449148876,
+   "critical": 0,
+   "id": "DR-133",
+   "before_blockage_pct": 25.9,
+   "risk": 0.29,
+   "priority": 0.304,
+   "risk_after": 0.29
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 7.9,
+   "cover_damaged": 1,
+   "days_since_clean": 0,
+   "elevation_m": 215.8243387312,
+   "imperviousness": 0.6677790904,
+   "rain_mm_24h": 60.0,
+   "past_events": 2,
+   "zone": "Tech Park",
+   "lat": 28.637839223,
+   "lon": 77.1796609412,
+   "critical": 0,
+   "id": "DR-134",
+   "before_blockage_pct": 37.2,
+   "risk": 0.472,
+   "priority": 0.519,
+   "risk_after": 0.137
+  },
+  {
+   "silt_depth_cm": 6.720973488,
+   "blockage_pct": 8.9,
+   "cover_damaged": 0,
+   "days_since_clean": 60,
+   "elevation_m": 217.1962028203,
+   "imperviousness": 0.6451959985,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Central Market",
+   "lat": 28.5987438966,
+   "lon": 77.2005961232,
+   "critical": 0,
+   "id": "DR-135",
+   "before_blockage_pct": 8.9,
+   "risk": 0.103,
+   "priority": 0.103,
+   "risk_after": 0.103
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 8.0,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 214.4546430848,
+   "imperviousness": 0.589000514,
+   "rain_mm_24h": 60.0,
+   "past_events": 3,
+   "zone": "Riverside",
+   "lat": 28.5944229628,
+   "lon": 77.2575715125,
+   "critical": 0,
+   "id": "DR-136",
+   "before_blockage_pct": 20.5,
+   "risk": 0.504,
+   "priority": 0.58,
+   "risk_after": 0.171
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 8.1,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 215.7691757235,
+   "imperviousness": 0.9512821258,
+   "rain_mm_24h": 60.0,
+   "past_events": 2,
+   "zone": "Tech Park",
+   "lat": 28.6267807382,
+   "lon": 77.2018770108,
+   "critical": 0,
+   "id": "DR-137",
+   "before_blockage_pct": 33.8,
+   "risk": 0.522,
+   "priority": 0.574,
+   "risk_after": 0.223
+  },
+  {
+   "silt_depth_cm": 1.2532853463,
+   "blockage_pct": 37.3,
+   "cover_damaged": 0,
+   "days_since_clean": 155,
+   "elevation_m": 215.7970656331,
+   "imperviousness": 0.8584290802,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.5935558664,
+   "lon": 77.2427894559,
+   "critical": 0,
+   "id": "DR-138",
+   "before_blockage_pct": 37.3,
+   "risk": 0.301,
+   "priority": 0.316,
+   "risk_after": 0.301
+  },
+  {
+   "silt_depth_cm": 6.3442827412,
+   "blockage_pct": 17.6,
+   "cover_damaged": 0,
+   "days_since_clean": 198,
+   "elevation_m": 215.7125100591,
+   "imperviousness": 0.5959610044,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Tech Park",
+   "lat": 28.6358724023,
+   "lon": 77.19678967,
+   "critical": 0,
+   "id": "DR-139",
+   "before_blockage_pct": 17.6,
+   "risk": 0.232,
+   "priority": 0.232,
+   "risk_after": 0.232
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 4.0,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 225.370510581,
+   "imperviousness": 1.0,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Tech Park",
+   "lat": 28.6280968874,
+   "lon": 77.2013803034,
+   "critical": 0,
+   "id": "DR-140",
+   "before_blockage_pct": 69.7,
+   "risk": 0.598,
+   "priority": 0.628,
+   "risk_after": 0.33
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 8.9,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 213.8020056804,
+   "imperviousness": 0.6747956387,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Central Market",
+   "lat": 28.5942688169,
+   "lon": 77.1985191626,
+   "critical": 0,
+   "id": "DR-141",
+   "before_blockage_pct": 41.1,
+   "risk": 0.462,
+   "priority": 0.462,
+   "risk_after": 0.161
+  },
+  {
+   "silt_depth_cm": 1.2988753849,
+   "blockage_pct": 72.4,
+   "cover_damaged": 1,
+   "days_since_clean": 142,
+   "elevation_m": 225.6775960576,
+   "imperviousness": 0.463802095,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Station Road",
+   "lat": 28.6281629679,
+   "lon": 77.2563515631,
+   "critical": 0,
+   "id": "DR-142",
+   "before_blockage_pct": 72.4,
+   "risk": 0.336,
+   "priority": 0.336,
+   "risk_after": 0.336
+  },
+  {
+   "silt_depth_cm": 14.4270626813,
+   "blockage_pct": 14.4,
+   "cover_damaged": 1,
+   "days_since_clean": 167,
+   "elevation_m": 214.7459813261,
+   "imperviousness": 0.787776799,
+   "rain_mm_24h": 60.0,
+   "past_events": 2,
+   "zone": "Tech Park",
+   "lat": 28.6366778615,
+   "lon": 77.1894819814,
+   "critical": 0,
+   "id": "DR-143",
+   "before_blockage_pct": 14.4,
+   "risk": 0.318,
+   "priority": 0.35,
+   "risk_after": 0.318
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.5,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 215.3353234292,
+   "imperviousness": 0.8114092092,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Old Town",
+   "lat": 28.5755830946,
+   "lon": 77.2985009826,
+   "critical": 0,
+   "id": "DR-144",
+   "before_blockage_pct": 20.6,
+   "risk": 0.517,
+   "priority": 0.543,
+   "risk_after": 0.169
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.8,
+   "cover_damaged": 1,
+   "days_since_clean": 0,
+   "elevation_m": 213.9170470274,
+   "imperviousness": 0.8882040217,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Central Market",
+   "lat": 28.6100015828,
+   "lon": 77.2045969547,
+   "critical": 0,
+   "id": "DR-145",
+   "before_blockage_pct": 32.2,
+   "risk": 0.478,
+   "priority": 0.478,
+   "risk_after": 0.095
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 7.6,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 219.794209877,
+   "imperviousness": 0.8334786828,
+   "rain_mm_24h": 60.0,
+   "past_events": 2,
+   "zone": "Old Town",
+   "lat": 28.5905404388,
+   "lon": 77.2816537511,
+   "critical": 0,
+   "id": "DR-146",
+   "before_blockage_pct": 54.5,
+   "risk": 0.638,
+   "priority": 0.702,
+   "risk_after": 0.168
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 7.1,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 220.5231078867,
+   "imperviousness": 0.7984034667,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Riverside",
+   "lat": 28.5837308866,
+   "lon": 77.2509687616,
+   "critical": 0,
+   "id": "DR-147",
+   "before_blockage_pct": 66.8,
+   "risk": 0.644,
+   "priority": 0.644,
+   "risk_after": 0.13
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 9.5,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 220.7554085208,
+   "imperviousness": 0.4146951352,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.6098225222,
+   "lon": 77.2569648598,
+   "critical": 0,
+   "id": "DR-148",
+   "before_blockage_pct": 79.9,
+   "risk": 0.775,
+   "priority": 0.814,
+   "risk_after": 0.316
+  },
+  {
+   "silt_depth_cm": 17.0040564361,
+   "blockage_pct": 28.5,
+   "cover_damaged": 0,
+   "days_since_clean": 48,
+   "elevation_m": 217.0010624594,
+   "imperviousness": 0.6334430274,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.6013901356,
+   "lon": 77.2371302013,
+   "critical": 0,
+   "id": "DR-149",
+   "before_blockage_pct": 28.5,
+   "risk": 0.193,
+   "priority": 0.203,
+   "risk_after": 0.193
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 8.7,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 214.8695848876,
+   "imperviousness": 0.6765647323,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Old Town",
+   "lat": 28.5949651359,
+   "lon": 77.2952473921,
+   "critical": 0,
+   "id": "DR-150",
+   "before_blockage_pct": 58.0,
+   "risk": 0.674,
+   "priority": 0.674,
+   "risk_after": 0.132
+  },
+  {
+   "silt_depth_cm": 8.7814497968,
+   "blockage_pct": 27.9,
+   "cover_damaged": 0,
+   "days_since_clean": 59,
+   "elevation_m": 210.7323054258,
+   "imperviousness": 0.4361350588,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Station Road",
+   "lat": 28.6199525557,
+   "lon": 77.2549834829,
+   "critical": 1,
+   "id": "DR-151",
+   "before_blockage_pct": 27.9,
+   "risk": 0.252,
+   "priority": 0.423,
+   "risk_after": 0.252
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 4.7,
+   "cover_damaged": 1,
+   "days_since_clean": 0,
+   "elevation_m": 216.1928611331,
+   "imperviousness": 0.584477483,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.5945337693,
+   "lon": 77.2032321988,
+   "critical": 0,
+   "id": "DR-152",
+   "before_blockage_pct": 66.7,
+   "risk": 0.77,
+   "priority": 0.809,
+   "risk_after": 0.092
+  },
+  {
+   "silt_depth_cm": 21.8636028526,
+   "blockage_pct": 37.6,
+   "cover_damaged": 0,
+   "days_since_clean": 165,
+   "elevation_m": 225.4984597156,
+   "imperviousness": 0.9389573232,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Old Town",
+   "lat": 28.6076908217,
+   "lon": 77.3080130509,
+   "critical": 0,
+   "id": "DR-153",
+   "before_blockage_pct": 37.6,
+   "risk": 0.379,
+   "priority": 0.379,
+   "risk_after": 0.379
+  },
+  {
+   "silt_depth_cm": 1.2141053207,
+   "blockage_pct": 36.4,
+   "cover_damaged": 0,
+   "days_since_clean": 112,
+   "elevation_m": 221.2082721016,
+   "imperviousness": 0.682541576,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Riverside",
+   "lat": 28.6012706957,
+   "lon": 77.2393826761,
+   "critical": 0,
+   "id": "DR-154",
+   "before_blockage_pct": 36.4,
+   "risk": 0.187,
+   "priority": 0.187,
+   "risk_after": 0.187
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.9,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 214.2599928196,
+   "imperviousness": 0.8484813972,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Station Road",
+   "lat": 28.6454883144,
+   "lon": 77.2378726419,
+   "critical": 1,
+   "id": "DR-155",
+   "before_blockage_pct": 55.7,
+   "risk": 0.543,
+   "priority": 0.912,
+   "risk_after": 0.163
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 7.9,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 211.8342313748,
+   "imperviousness": 0.4792718604,
+   "rain_mm_24h": 60.0,
+   "past_events": 4,
+   "zone": "Riverside",
+   "lat": 28.6044608171,
+   "lon": 77.2506625585,
+   "critical": 0,
+   "id": "DR-156",
+   "before_blockage_pct": 49.8,
+   "risk": 0.873,
+   "priority": 1.048,
+   "risk_after": 0.217
+  },
+  {
+   "silt_depth_cm": 4.7820554993,
+   "blockage_pct": 61.1,
+   "cover_damaged": 0,
+   "days_since_clean": 49,
+   "elevation_m": 217.7444778269,
+   "imperviousness": 0.6292284814,
+   "rain_mm_24h": 60.0,
+   "past_events": 0,
+   "zone": "Central Market",
+   "lat": 28.6058186481,
+   "lon": 77.2040407847,
+   "critical": 0,
+   "id": "DR-157",
+   "before_blockage_pct": 61.1,
+   "risk": 0.382,
+   "priority": 0.382,
+   "risk_after": 0.382
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.5,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 211.3385179778,
+   "imperviousness": 0.5737692391,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Riverside",
+   "lat": 28.5882321309,
+   "lon": 77.2502579342,
+   "critical": 0,
+   "id": "DR-158",
+   "before_blockage_pct": 23.4,
+   "risk": 0.503,
+   "priority": 0.528,
+   "risk_after": 0.186
+  },
+  {
+   "silt_depth_cm": 2.0,
+   "blockage_pct": 6.9,
+   "cover_damaged": 0,
+   "days_since_clean": 0,
+   "elevation_m": 216.324094337,
+   "imperviousness": 0.6169372691,
+   "rain_mm_24h": 60.0,
+   "past_events": 1,
+   "zone": "Central Market",
+   "lat": 28.6018790176,
+   "lon": 77.2031264281,
+   "critical": 0,
+   "id": "DR-159",
+   "before_blockage_pct": 78.0,
+   "risk": 0.694,
+   "priority": 0.729,
+   "risk_after": 0.154
+  }
+ ],
+ "tasks": [
+  {
+   "drain": "DR-124",
+   "crew": "Crew B",
+   "zone": "Hospital Belt",
+   "risk": 0.741,
+   "priority": 1.245,
+   "slot": "T-33h",
+   "dur_h": 1.0,
+   "reason": "critical site; blockage 54%, silt 10 cm, 255 d since cleaned",
+   "after_blockage": 10.6,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-156",
+   "crew": "Crew C",
+   "zone": "Riverside",
+   "risk": 0.873,
+   "priority": 1.048,
+   "slot": "T-33h",
+   "dur_h": 1.0,
+   "reason": "blockage 50%, silt 24 cm, 197 d since cleaned",
+   "after_blockage": 7.9,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-106",
+   "crew": "Crew B",
+   "zone": "Station Road",
+   "risk": 0.908,
+   "priority": 0.999,
+   "slot": "T-31h",
+   "dur_h": 1.0,
+   "reason": "blockage 81%, silt 13 cm, 220 d since cleaned",
+   "after_blockage": 12.2,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-155",
+   "crew": "Crew B",
+   "zone": "Station Road",
+   "risk": 0.543,
+   "priority": 0.912,
+   "slot": "T-30h",
+   "dur_h": 1.0,
+   "reason": "critical site; blockage 56%, silt 0 cm, 214 d since cleaned",
+   "after_blockage": 6.9,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-112",
+   "crew": "Crew C",
+   "zone": "Station Road",
+   "risk": 0.522,
+   "priority": 0.877,
+   "slot": "T-31h",
+   "dur_h": 1.0,
+   "reason": "critical site; blockage 49%, silt 14 cm, 67 d since cleaned",
+   "after_blockage": 9.6,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-103",
+   "crew": "Crew C",
+   "zone": "Old Town",
+   "risk": 0.817,
+   "priority": 0.858,
+   "slot": "T-30h",
+   "dur_h": 1.0,
+   "reason": "blockage 68%, silt 18 cm, 194 d since cleaned",
+   "after_blockage": 10.4,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-115",
+   "crew": "Crew C",
+   "zone": "Old Town",
+   "risk": 0.812,
+   "priority": 0.853,
+   "slot": "T-28h",
+   "dur_h": 1.5,
+   "reason": "blockage 58%, silt 25 cm, 257 d since cleaned",
+   "after_blockage": 7.1,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-128",
+   "crew": "Crew B",
+   "zone": "Riverside",
+   "risk": 0.753,
+   "priority": 0.828,
+   "slot": "T-29h",
+   "dur_h": 0.6,
+   "reason": "blockage 43%, silt 13 cm, 118 d since cleaned",
+   "after_blockage": 9.0,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-148",
+   "crew": "Crew B",
+   "zone": "Riverside",
+   "risk": 0.775,
+   "priority": 0.814,
+   "slot": "T-28h",
+   "dur_h": 1.0,
+   "reason": "blockage 80%, silt 24 cm, 287 d since cleaned",
+   "after_blockage": 9.5,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-152",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.77,
+   "priority": 0.809,
+   "slot": "T-34h",
+   "dur_h": 0.6,
+   "reason": "blockage 67%, silt 12 cm, 118 d since cleaned",
+   "after_blockage": 4.7,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-123",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.781,
+   "priority": 0.781,
+   "slot": "T-32h",
+   "dur_h": 1.0,
+   "reason": "blockage 62%, silt 13 cm, 294 d since cleaned",
+   "after_blockage": 10.7,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-117",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.739,
+   "priority": 0.776,
+   "slot": "T-31h",
+   "dur_h": 1.0,
+   "reason": "blockage 49%, silt 19 cm, 148 d since cleaned",
+   "after_blockage": 6.4,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-100",
+   "crew": "Crew C",
+   "zone": "Old Town",
+   "risk": 0.752,
+   "priority": 0.752,
+   "slot": "T-26h",
+   "dur_h": 1.0,
+   "reason": "blockage 67%, silt 11 cm, 156 d since cleaned",
+   "after_blockage": 5.4,
+   "verified": true,
+   "status": "REOPENED -> VERIFIED",
+   "redispatch": true
+  },
+  {
+   "drain": "DR-159",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.694,
+   "priority": 0.729,
+   "slot": "T-29h",
+   "dur_h": 1.0,
+   "reason": "blockage 78%, silt 13 cm, 118 d since cleaned",
+   "after_blockage": 6.9,
+   "verified": true,
+   "status": "REOPENED -> VERIFIED",
+   "redispatch": true
+  },
+  {
+   "drain": "DR-146",
+   "crew": "Crew C",
+   "zone": "Old Town",
+   "risk": 0.638,
+   "priority": 0.702,
+   "slot": "T-25h",
+   "dur_h": 1.0,
+   "reason": "blockage 54%, silt 7 cm, 197 d since cleaned",
+   "after_blockage": 7.6,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-132",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.643,
+   "priority": 0.675,
+   "slot": "T-28h",
+   "dur_h": 1.0,
+   "reason": "blockage 34%, silt 13 cm, 279 d since cleaned",
+   "after_blockage": 6.0,
+   "verified": true,
+   "status": "REOPENED -> VERIFIED",
+   "redispatch": true
+  },
+  {
+   "drain": "DR-150",
+   "crew": "Crew C",
+   "zone": "Old Town",
+   "risk": 0.674,
+   "priority": 0.674,
+   "slot": "T-23h",
+   "dur_h": 1.0,
+   "reason": "blockage 58%, silt 24 cm, 137 d since cleaned",
+   "after_blockage": 8.7,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-120",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.575,
+   "priority": 0.661,
+   "slot": "T-26h",
+   "dur_h": 1.0,
+   "reason": "blockage 66%, silt 18 cm, 42 d since cleaned",
+   "after_blockage": 4.6,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-108",
+   "crew": "Crew B",
+   "zone": "Riverside",
+   "risk": 0.624,
+   "priority": 0.655,
+   "slot": "T-26h",
+   "dur_h": 1.0,
+   "reason": "blockage 42%, silt 6 cm, 231 d since cleaned",
+   "after_blockage": 9.7,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-129",
+   "crew": "Crew C",
+   "zone": "Old Town",
+   "risk": 0.621,
+   "priority": 0.652,
+   "slot": "T-22h",
+   "dur_h": 1.0,
+   "reason": "blockage 51%, silt 21 cm, 166 d since cleaned",
+   "after_blockage": 7.6,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-118",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.617,
+   "priority": 0.648,
+   "slot": "T-25h",
+   "dur_h": 1.0,
+   "reason": "blockage 51%, silt 2 cm, 110 d since cleaned",
+   "after_blockage": 6.4,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-147",
+   "crew": "Crew B",
+   "zone": "Riverside",
+   "risk": 0.644,
+   "priority": 0.644,
+   "slot": "T-25h",
+   "dur_h": 1.0,
+   "reason": "blockage 67%, silt 6 cm, 247 d since cleaned",
+   "after_blockage": 7.1,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-140",
+   "crew": "Crew A",
+   "zone": "Tech Park",
+   "risk": 0.598,
+   "priority": 0.628,
+   "slot": "T-23h",
+   "dur_h": 1.0,
+   "reason": "blockage 70%, silt 20 cm, 50 d since cleaned",
+   "after_blockage": 4.0,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-131",
+   "crew": "Crew A",
+   "zone": "Central Market",
+   "risk": 0.581,
+   "priority": 0.61,
+   "slot": "T-22h",
+   "dur_h": 1.0,
+   "reason": "blockage 43%, silt 16 cm, 177 d since cleaned",
+   "after_blockage": 3.7,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-110",
+   "crew": "Crew A",
+   "zone": "Tech Park",
+   "risk": 0.562,
+   "priority": 0.59,
+   "slot": "T-20h",
+   "dur_h": 1.0,
+   "reason": "blockage 61%, silt 10 cm, 147 d since cleaned",
+   "after_blockage": 4.9,
+   "verified": true,
+   "status": "REOPENED -> VERIFIED",
+   "redispatch": true
+  },
+  {
+   "drain": "DR-119",
+   "crew": "Crew B",
+   "zone": "Central Market",
+   "risk": 0.583,
+   "priority": 0.583,
+   "slot": "T-23h",
+   "dur_h": 1.0,
+   "reason": "blockage 12%, silt 13 cm, 192 d since cleaned",
+   "after_blockage": 6.4,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-136",
+   "crew": "Crew C",
+   "zone": "Riverside",
+   "risk": 0.504,
+   "priority": 0.58,
+   "slot": "T-20h",
+   "dur_h": 1.0,
+   "reason": "blockage 20%, silt 8 cm, 214 d since cleaned",
+   "after_blockage": 8.0,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-137",
+   "crew": "Crew A",
+   "zone": "Tech Park",
+   "risk": 0.522,
+   "priority": 0.574,
+   "slot": "T-19h",
+   "dur_h": 1.0,
+   "reason": "blockage 34%, silt 19 cm, 166 d since cleaned",
+   "after_blockage": 8.1,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-122",
+   "crew": "Crew B",
+   "zone": "Central Market",
+   "risk": 0.542,
+   "priority": 0.569,
+   "slot": "T-22h",
+   "dur_h": 1.0,
+   "reason": "blockage 44%, silt 16 cm, 141 d since cleaned",
+   "after_blockage": 9.5,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-144",
+   "crew": "Crew C",
+   "zone": "Old Town",
+   "risk": 0.517,
+   "priority": 0.543,
+   "slot": "T-19h",
+   "dur_h": 1.0,
+   "reason": "blockage 21%, silt 21 cm, 257 d since cleaned",
+   "after_blockage": 6.5,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-127",
+   "crew": "Crew A",
+   "zone": "Tech Park",
+   "risk": 0.529,
+   "priority": 0.529,
+   "slot": "T-18h",
+   "dur_h": 0.6,
+   "reason": "blockage 33%, silt 9 cm, 189 d since cleaned",
+   "after_blockage": 9.2,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-158",
+   "crew": "Crew B",
+   "zone": "Riverside",
+   "risk": 0.503,
+   "priority": 0.528,
+   "slot": "T-20h",
+   "dur_h": 1.0,
+   "reason": "blockage 23%, silt 15 cm, 252 d since cleaned",
+   "after_blockage": 6.5,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-134",
+   "crew": "Crew A",
+   "zone": "Tech Park",
+   "risk": 0.472,
+   "priority": 0.519,
+   "slot": "T-17h",
+   "dur_h": 0.6,
+   "reason": "blockage 37%, silt 17 cm, 65 d since cleaned",
+   "after_blockage": 7.9,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-116",
+   "crew": "Crew B",
+   "zone": "Tech Park",
+   "risk": 0.491,
+   "priority": 0.491,
+   "slot": "T-19h",
+   "dur_h": 1.0,
+   "reason": "blockage 49%, silt 9 cm, 140 d since cleaned",
+   "after_blockage": 4.8,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-145",
+   "crew": "Crew B",
+   "zone": "Central Market",
+   "risk": 0.478,
+   "priority": 0.478,
+   "slot": "T-18h",
+   "dur_h": 0.6,
+   "reason": "blockage 32%, silt 24 cm, 37 d since cleaned",
+   "after_blockage": 6.8,
+   "verified": true,
+   "status": "VERIFIED"
+  },
+  {
+   "drain": "DR-141",
+   "crew": "Crew C",
+   "zone": "Central Market",
+   "risk": 0.462,
+   "priority": 0.462,
+   "slot": "T-17h",
+   "dur_h": 1.0,
+   "reason": "blockage 41%, silt 10 cm, 91 d since cleaned",
+   "after_blockage": 8.9,
+   "verified": true,
+   "status": "VERIFIED"
+  }
+ ],
+ "log": [
+  {
+   "t": "T-36h",
+   "step": "PREDICT",
+   "msg": "Model scored 60 drains for 60 mm forecast; 36 above risk threshold 0.45."
+  },
+  {
+   "t": "T-35h",
+   "step": "PLAN",
+   "msg": "Assigned 36 tasks to 3 crews; optimised sequence per crew; all slots end before rain onset."
+  },
+  {
+   "t": "T-35h",
+   "step": "DISPATCH",
+   "msg": "Crew A: 13 drains, 11.8 h shift."
+  },
+  {
+   "t": "T-35h",
+   "step": "DISPATCH",
+   "msg": "Crew B: 12 drains, 11.2 h shift."
+  },
+  {
+   "t": "T-35h",
+   "step": "DISPATCH",
+   "msg": "Crew C: 11 drains, 11.5 h shift."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-124 after-photo: debris 11% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-156 after-photo: debris 8% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-106 after-photo: debris 12% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-155 after-photo: debris 7% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-112 after-photo: debris 10% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-103 after-photo: debris 10% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-115 after-photo: debris 7% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-128 after-photo: debris 9% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-148 after-photo: debris 10% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-152 after-photo: debris 5% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-123 after-photo: debris 11% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-117 after-photo: debris 6% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "REOPEN",
+   "msg": "DR-100 after-photo: debris 61% -> NOT cleared, task reopened & crew re-dispatched."
+  },
+  {
+   "t": "T-20h",
+   "step": "REOPEN",
+   "msg": "DR-159 after-photo: debris 48% -> NOT cleared, task reopened & crew re-dispatched."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-146 after-photo: debris 8% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "REOPEN",
+   "msg": "DR-132 after-photo: debris 40% -> NOT cleared, task reopened & crew re-dispatched."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-150 after-photo: debris 9% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-120 after-photo: debris 5% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-108 after-photo: debris 10% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-129 after-photo: debris 8% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-118 after-photo: debris 6% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-147 after-photo: debris 7% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-140 after-photo: debris 4% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-131 after-photo: debris 4% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "REOPEN",
+   "msg": "DR-110 after-photo: debris 54% -> NOT cleared, task reopened & crew re-dispatched."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-119 after-photo: debris 6% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-136 after-photo: debris 8% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-137 after-photo: debris 8% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-122 after-photo: debris 10% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-144 after-photo: debris 6% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-127 after-photo: debris 9% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-158 after-photo: debris 6% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-134 after-photo: debris 8% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-116 after-photo: debris 5% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-145 after-photo: debris 7% -> closed."
+  },
+  {
+   "t": "T-20h",
+   "step": "VERIFY",
+   "msg": "DR-141 after-photo: debris 9% -> closed."
+  },
+  {
+   "t": "T-12h",
+   "step": "REPORT",
+   "msg": "High-risk drains 36 -> 0. Citywide mean risk 0.49 -> 0.21."
+  }
+ ],
+ "crews": [
+  {
+   "id": "Crew A",
+   "hours": 11.8,
+   "n": 13
+  },
+  {
+   "id": "Crew B",
+   "hours": 11.2,
+   "n": 12
+  },
+  {
+   "id": "Crew C",
+   "hours": 11.5,
+   "n": 11
+  }
+ ]
+};const S=D.summary;const $=id=>document.getElementById(id);
+$('rain').textContent=S.rain_mm;$('eta').textContent=S.rain_eta_h;
+const kp=[[S.drains,'Drains monitored'],[S.high_risk_before,'High-risk before action'],[S.tasks,'Tasks auto-assigned'],[S.verified+'/'+S.tasks,'Verified by photo'],[S.high_risk_after,'High-risk after action']];
+$('kpis').innerHTML=kp.map((k,i)=>`<div class="k"><div class="v" style="color:${i==1?'#d64545':i==4?'#2f9e6b':'inherit'}">${k[0]}</div><div class="l">${k[1]}</div></div>`).join('');
+const col=r=>r>=.65?'#d64545':r>=.45?'#e8a317':'#2f9e6b',cls=r=>r>=.65?'hi':r>=.45?'md':'lo';
+const bar=(v,c)=>`<span class="bar"><i style="width:${Math.round(v*100)}%;background:${c}"></i></span>`;
+const byId=Object.fromEntries(D.drains.map(d=>[d.id,d])),T=D.tasks;
+const titles={map:'Where will the city flood? Risk map',tasks:'Autonomous maintenance planning',verify:'Closing the loop: proof of work',log:'Agent activity & impact'};
+function show(){let h=(location.hash||'#map').slice(1);if(!titles[h])h='map';$('title').textContent=titles[h];
+ ['map','tasks','verify','log'].forEach(v=>{$('v-'+v).classList.toggle('on',v===h);$('n-'+v).classList.toggle('on',v===h)});}
+show();window.addEventListener('hashchange',show);
+// map
+const la=D.drains.map(d=>d.lat),lo=D.drains.map(d=>d.lon),[a0,a1]=[Math.min(...la),Math.max(...la)],[o0,o1]=[Math.min(...lo),Math.max(...lo)];
+const X=d=>30+(d.lon-o0)/(o1-o0)*640,Y=d=>380-(d.lat-a0)/(a1-a0)*350;let m='<rect width="700" height="410" rx="10" fill="#eaf1f8"/>';
+for(let i=0;i<8;i++)m+=`<line x1="${30+i*92}" y1="10" x2="${30+i*92}" y2="400" stroke="#d8e3ee"/><line x1="10" y1="${20+i*52}" x2="690" y2="${20+i*52}" stroke="#d8e3ee"/>`;
+const zs={};D.drains.forEach(d=>{(zs[d.zone]=zs[d.zone]||[]).push(d)});
+Object.entries(zs).forEach(([z,a])=>{const cx=a.reduce((s,d)=>s+X(d),0)/a.length,cy=a.reduce((s,d)=>s+Y(d),0)/a.length;m+=`<text x="${cx}" y="${cy-34}" text-anchor="middle" font-size="11" fill="#6a7f96" font-weight="600">${z}</text>`});
+D.drains.forEach(d=>{if(d.critical)m+=`<circle cx="${X(d)}" cy="${Y(d)}" r="13" fill="none" stroke="#0b2540" stroke-width="1.5" stroke-dasharray="3 2"/>`;m+=`<circle cx="${X(d)}" cy="${Y(d)}" r="${5+d.risk*5}" fill="${col(d.risk)}" fill-opacity=".85" stroke="#fff" stroke-width="1.2"/>`});
+$('map').innerHTML=m;
+const topN=[...D.drains].sort((a,b)=>b.priority-a.priority).slice(0,10);
+$("top").innerHTML="<tr><th>Drain</th><th>Zone</th><th>Risk</th><th>Blocked</th></tr>"+topN.map(d=>`<tr><td><b>${d.id}</b></td><td>${d.zone}${d.critical?' &#9733;':''}</td><td>${bar(d.risk,col(d.risk))} <span class="b ${cls(d.risk)}">${d.risk.toFixed(2)}</span></td><td>${d.before_blockage_pct.toFixed(0)}%</td></tr>`).join('');
+// tasks
+$('tt').innerHTML='<tr><th>#</th><th>Drain</th><th>Zone</th><th>Risk</th><th>Crew</th><th>Slot</th><th>Why (evidence)</th></tr>'+T.slice(0,14).map((t,i)=>`<tr><td>${i+1}</td><td><b>${t.drain}</b></td><td>${t.zone}</td><td><span class="b ${cls(t.risk)}">${t.risk.toFixed(2)}</span></td><td>${t.crew}</td><td>${t.slot}</td><td style="color:#5b6b80">${t.reason}</td></tr>`).join('');
+$('crews').innerHTML=D.crews.map(c=>`<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><b>${c.id}</b><span style="color:#5b6b80">${c.n} drains &middot; ${c.hours} h</span></div>${'<span class="bar" style="width:100%;height:9px"><i style="width:'+Math.min(100,c.hours/12*100)+'%;background:#0fa3a3"></i></span>'}</div>`).join('');
+// verify
+const ex=T.filter(t=>t.status==='VERIFIED').slice(0,2).concat(T.filter(t=>t.redispatch).slice(0,0));
+const pick=T.filter(t=>t.status==='VERIFIED').slice(0,4);
+$('pairs').innerHTML=pick.map(t=>`<div><b>${t.drain}</b> &middot; ${t.zone}<div class="pair"><figure><img src="img/${t.drain}_before.jpg"><figcaption>Before &middot; debris ${byId[t.drain].before_blockage_pct.toFixed(0)}%</figcaption></figure><figure><img src="img/${t.drain}_after.jpg"><figcaption>After &middot; debris ${t.after_blockage.toFixed(0)}% &#10003; verified</figcaption></figure></div></div>`).join('')+
+ (()=>{const r=T.find(t=>t.redispatch);return r?`<div style="grid-column:1/3;background:#fdf6e3;border-radius:8px;padding:8px 12px;font-size:12.5px"><b>${r.drain}</b>: first after-photo still showed heavy debris, so the agent rejected the job and re-dispatched the crew. Final check passed at ${r.after_blockage.toFixed(0)}%.</div>`:''})();
+$('vt').innerHTML='<tr><th>Drain</th><th>Debris after</th><th>Status</th></tr>'+T.slice(0,12).map(t=>`<tr><td><b>${t.drain}</b></td><td>${t.after_blockage.toFixed(0)}%</td><td><span class="b ${t.redispatch?'re':'ok'}">${t.status}</span></td></tr>`).join('');
+// log
+const pr=['PREDICT','PLAN','DISPATCH','REOPEN','VERIFY','REPORT'];const lg=[...D.log.filter(l=>l.step!=='VERIFY')].slice(0,8).concat(D.log.filter(l=>l.step==='VERIFY').slice(0,3),D.log.filter(l=>l.step==='REPORT'));
+$('log').innerHTML=lg.map(l=>`<div><span class="t">${l.t}</span><span class="s ${l.step}">${l.step}</span><span>${l.msg}</span></div>`).join('');
+// before/after bars
+const mx=Math.max(S.mean_risk_before,.01);let b='';[['Before',S.mean_risk_before,'#d64545'],['After',S.mean_risk_after,'#2f9e6b']].forEach((r,i)=>{const hh=r[1]*260,x=70+i*160;b+=`<rect x="${x}" y="${290-hh}" width="90" height="${hh}" rx="6" fill="${r[2]}"/><text x="${x+45}" y="${282-hh}" text-anchor="middle" font-weight="700" font-size="16" fill="#0f1f33">${r[1].toFixed(2)}</text><text x="${x+45}" y="312" text-anchor="middle" font-size="12" fill="#5b6b80">${r[0]}</text>`});
+b+=`<text x="12" y="22" font-size="11.5" fill="#5b6b80">Mean citywide waterlogging risk (60 mm rain)</text>`;$('ba').innerHTML=b;
+$('imp').innerHTML=D.model.importances.slice(0,4).map(i=>`<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:130px;font-size:12px">${i[0].replace(/_/g,' ')}</span>${bar(i[1]*2.2,'#2e6fd8')}<span style="font-size:12px;color:#5b6b80">${(i[1]*100).toFixed(0)}%</span></div>`).join('');
+</script></body></html>
